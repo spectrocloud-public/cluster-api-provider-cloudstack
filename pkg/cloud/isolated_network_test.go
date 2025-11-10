@@ -116,8 +116,9 @@ var _ = ginkgo.Describe("Network", func() {
 					Return(&csapi.CreateEgressFirewallRuleResponse{}, nil),
 			)
 
-			// Expect 6 ListTags calls: 3 for network (AddCreatedByCAPCTag, AddClusterTag x2),
-			// 3 for public IP (GetPublicIP, AddClusterTag, AddCreatedByCAPCTag)
+			// 6 ListTags calls total: 3 for network (AddCreatedByCAPCTag, then AddClusterTag
+			// which internally calls GetTags twice: IsCapcManaged + removeOldClusterTags),
+			// 3 for public IP (GetPublicIP, AddClusterTag, AddCreatedByCAPCTag).
 			emptyResponse := &csapi.ListTagsResponse{Tags: []*csapi.Tag{}}
 			clusterTagResponse := &csapi.ListTagsResponse{Tags: []*csapi.Tag{{Key: cloud.CreatedByCAPCTagName, Value: "1"}}}
 			gomock.InOrder(
@@ -125,7 +126,7 @@ var _ = ginkgo.Describe("Network", func() {
 				rs.EXPECT().ListTags(gomock.Any()).Return(emptyResponse, nil),
 				rs.EXPECT().NewListTagsParams().Return(&csapi.ListTagsParams{}), // For AddClusterTag (Network, IsCapcManaged)
 				rs.EXPECT().ListTags(gomock.Any()).Return(clusterTagResponse, nil),
-				rs.EXPECT().NewListTagsParams().Return(&csapi.ListTagsParams{}), // For AddClusterTag (Network, AddTags)
+				rs.EXPECT().NewListTagsParams().Return(&csapi.ListTagsParams{}), // For AddClusterTag (Network, removeOldClusterTags)
 				rs.EXPECT().ListTags(gomock.Any()).Return(clusterTagResponse, nil),
 				rs.EXPECT().NewListTagsParams().Return(&csapi.ListTagsParams{}), // For GetPublicIP (PublicIpAddress)
 				rs.EXPECT().ListTags(gomock.Any()).Return(clusterTagResponse, nil),
@@ -305,14 +306,16 @@ var _ = ginkgo.Describe("Network", func() {
 			aip := &csapi.AssociateIpAddressParams{}
 			as.EXPECT().NewAssociateIpAddressParams().Return(aip)
 			as.EXPECT().AssociateIpAddress(aip).Return(&csapi.AssociateIpAddressResponse{}, nil)
+			// Will add cluster tag once to PublicIP; AddClusterTag calls GetTags twice
+			// (IsCapcManaged + removeOldClusterTags), then AddCreatedByCAPCTag calls it once.
 			createdByResponse := &csapi.ListTagsResponse{Tags: []*csapi.Tag{{Key: cloud.CreatedByCAPCTagName, Value: "1"}}}
 			emptyResponse := &csapi.ListTagsResponse{Tags: []*csapi.Tag{}}
 			gomock.InOrder(
 				rs.EXPECT().NewListTagsParams().Return(&csapi.ListTagsParams{}), // AddClusterTag: IsCapcManaged
 				rs.EXPECT().ListTags(gomock.Any()).Return(createdByResponse, nil),
-				rs.EXPECT().NewListTagsParams().Return(&csapi.ListTagsParams{}), // AddClusterTag: AddTags
+				rs.EXPECT().NewListTagsParams().Return(&csapi.ListTagsParams{}), // AddClusterTag: removeOldClusterTags
 				rs.EXPECT().ListTags(gomock.Any()).Return(emptyResponse, nil),
-				rs.EXPECT().NewListTagsParams().Return(&csapi.ListTagsParams{}), // AddCreatedByCAPCTag: AddTags
+				rs.EXPECT().NewListTagsParams().Return(&csapi.ListTagsParams{}), // AddCreatedByCAPCTag
 				rs.EXPECT().ListTags(gomock.Any()).Return(emptyResponse, nil),
 			)
 			rs.EXPECT().NewCreateTagsParams(gomock.Any(), gomock.Any(), gomock.Any()).
