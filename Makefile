@@ -230,6 +230,7 @@ DOCKER_BUILD_INPUTS=$(MANAGER_BIN_INPUTS) Dockerfile
 docker-build: generate-deepcopy generate-conversion ## Build docker image containing the controller manager.
 	docker buildx build --load --platform linux/${ARCH} ${BUILD_ARGS} --build-arg ARCH=$(ARCH) . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
 	@echo $(CONTROLLER_IMG)-$(ARCH):$(TAG)
+	@touch .dockerflag.mk
 
 .PHONY: docker-build-all ## Build all the architecture docker images
 docker-build-all: $(addprefix docker-build-,$(ALL_ARCH))
@@ -255,12 +256,10 @@ docker-push-core-manifest: ## Push the fat manifest docker image.
 
 .PHONY: docker-push-manifest
 docker-push-manifest: ## Push the manifest image
-	@# Extract the actual image digests from the architecture-specific manifest lists
-	@amd64_digest=$$(docker buildx imagetools inspect ${CONTROLLER_IMAGE}-amd64:${TAG} --format "{{json .}}" | jq -r '.manifest.manifests[] | select(.platform.architecture=="amd64") | .digest'); \
-	arm64_digest=$$(docker buildx imagetools inspect ${CONTROLLER_IMAGE}-arm64:${TAG} --format "{{json .}}" | jq -r '.manifest.manifests[] | select(.platform.architecture=="arm64") | .digest'); \
+	@# Create multi-platform manifest from architecture-specific images
 	docker buildx imagetools create -t ${CONTROLLER_IMAGE}:${TAG} \
-		${CONTROLLER_IMAGE}-amd64@$$amd64_digest \
-		${CONTROLLER_IMAGE}-arm64@$$arm64_digest
+		${CONTROLLER_IMAGE}-amd64:${TAG} \
+		${CONTROLLER_IMAGE}-arm64:${TAG}
 
 ##@ Tilt
 ## --------------------------------------
