@@ -1,7 +1,7 @@
 ARG BUILDER_GOLANG_VERSION
 ARG ARCH
 
-FROM --platform=$ARCH us-docker.pkg.dev/palette-images/build-base-images/golang:${BUILDER_GOLANG_VERSION}-alpine as toolchain
+FROM --platform=$ARCH us-central1-docker.pkg.dev/palette-images-dev/hardened-images/builder/golang:${BUILDER_GOLANG_VERSION}-alpine as toolchain
 
 ARG goproxy=https://proxy.golang.org
 ENV GOPROXY=$goproxy
